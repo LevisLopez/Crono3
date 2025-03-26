@@ -7,46 +7,88 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { text-align: center; font-family: Arial, sans-serif; background-color: #000; color: #0f0; }
-        canvas { max-width: 300px; margin: 20px auto; display: block; }
         .container { margin-top: 20px; }
-        button { padding: 10px 20px; font-size: 16px; margin: 5px; cursor: pointer; }
-        #kmTotal { font-size: 20px; }
-        .toggle-color { background-color: #333; color: #fff; border: none; padding: 10px; cursor: pointer; }
-        #speedDisplay { font-size: 50px; font-weight: bold; margin-top: 10px; }
+        button { padding: 12px 24px; font-size: 20px; margin: 5px; cursor: pointer; border-radius: 10px; border: none; transition: transform 0.1s, background-color 0.3s; background: linear-gradient(45deg, #007BFF, #00FF00); color: white; }
+        button:active { transform: scale(0.95); background-color: #555; }
+        #kmTotal { font-size: 50px; font-weight: bold; }
+        #speedDisplay { font-size: 100px; font-family: 'Digital-7', sans-serif; margin-top: 10px; }
+        @font-face {
+            font-family: 'Digital-7';
+            src: url('https://fonts.cdnfonts.com/s/16119/Digital7-rg1mL.woff') format('woff');
+        }
+        .speedometer-container {
+            position: relative;
+            width: 300px;
+            height: 160px;
+            margin: auto;
+        }
+        .arc {
+            width: 100%;
+            height: 100%;
+            border-radius: 300px 300px 0 0;
+            background: conic-gradient(
+                red 0deg, orange 60deg, yellow 120deg, green 180deg
+            );
+        }
+        .needle {
+            position: absolute;
+            width: 6px;
+            height: 90px;
+            background: red;
+            top: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotate(-90deg);
+            transition: transform 0.3s ease-out;
+        }
     </style>
 </head>
 <body>
     <h2>Velocímetro GPS</h2>
-    <canvas id="speedometer"></canvas>
+    <div class="speedometer-container">
+        <div class="arc"></div>
+        <div class="needle" id="needle"></div>
+    </div>
     <p id="speedDisplay">0 km/h</p>
     <div class="container">
         <button onclick="startTracking()">Iniciar</button>
         <button onclick="stopTracking()">Detener</button>
         <button onclick="resetKM()">Reiniciar KM</button>
-        <button class="toggle-color" onclick="toggleColor()">Cambiar Color</button>
+        <button onclick="resetSpeed()">Restablecer</button>
         <p>Distancia recorrida: <span id="distance">0</span> km</p>
         <p>Total acumulado: <span id="kmTotal">0</span> km</p>
+        <p>Tiempo transcurrido: <span id="elapsedTime">0</span> s</p>
+        <p>Velocidad promedio: <span id="averageSpeed">0</span> km/h</p>
     </div>
     
     <script>
         let kmTotal = parseFloat(localStorage.getItem('kmTotal')) || 0;
         let prevPosition = null;
         let watchId = null;
-        let colorState = true; // true: verde, false: azul
+        let startTime = null;
+        let elapsedTime = 0;
+        let totalSpeed = 0;
+        let speedCount = 0;
         document.getElementById('kmTotal').innerText = kmTotal.toFixed(2);
 
         function updateSpeedometer(speed) {
-            document.getElementById('speedDisplay').innerText = speed.toFixed(1) + " km/h";
-            speedometerChart.data.datasets[0].data = [speed, 120 - speed];
-            speedometerChart.update();
+            let displaySpeed = speed * 3.6;
+            document.getElementById('speedDisplay').innerText = displaySpeed.toFixed(1) + " km/h";
+            document.getElementById('needle').style.transform = `translateX(-50%) rotate(${(displaySpeed / 120) * 180 - 90}deg)`;
+            totalSpeed += displaySpeed;
+            speedCount++;
+            document.getElementById('averageSpeed').innerText = (totalSpeed / speedCount).toFixed(1);
         }
 
         function startTracking() {
             if (watchId === null) {
+                startTime = Date.now();
                 watchId = navigator.geolocation.watchPosition(position => {
                     let { speed, latitude, longitude } = position.coords;
                     if (speed === null) speed = 0;
-                    updateSpeedometer(speed * 3.6);
+                    updateSpeedometer(speed);
+                    elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                    document.getElementById('elapsedTime').innerText = elapsedTime;
                     
                     if (prevPosition) {
                         let distance = calculateDistance(prevPosition.latitude, prevPosition.longitude, latitude, longitude);
@@ -75,14 +117,19 @@
             document.getElementById('kmTotal').innerText = "0";
             document.getElementById('distance').innerText = "0";
         }
-        
-        function toggleColor() {
-            colorState = !colorState;
-            document.body.style.color = colorState ? '#0f0' : '#00f';
+
+        function resetSpeed() {
+            updateSpeedometer(0);
+            stopTracking();
+            elapsedTime = 0;
+            document.getElementById('elapsedTime').innerText = "0";
+            document.getElementById('averageSpeed').innerText = "0";
+            totalSpeed = 0;
+            speedCount = 0;
         }
         
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Radio de la Tierra en km
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -91,17 +138,6 @@
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return R * c;
         }
-
-        function drawSpeedometer() {
-            let ctx = document.getElementById('speedometer').getContext('2d');
-            speedometerChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: { labels: ['Velocidad', 'Restante'], datasets: [{ data: [0, 120], backgroundColor: ['#0f0', '#333'] }] },
-                options: { rotation: -90, circumference: 180, cutout: '70%' }
-            });
-        }
-        
-        drawSpeedometer();
     </script>
 </body>
 </html>
