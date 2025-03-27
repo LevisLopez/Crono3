@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Velocímetro GPS</title>
-  <!-- Cargamos interact.js para que las burbujas sean arrastrables -->
+  <!-- Cargamos interact.js desde un CDN -->
   <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
   <style>
     /* RESET BÁSICO */
@@ -33,7 +33,7 @@
       position: relative;
       padding-bottom: 20px;
     }
-    /* Velocímetro circular, mostrando semicírculo de 0..120 */
+    /* Velocímetro: burbuja grande */
     .speedometer {
       position: relative;
       width: 280px;
@@ -127,7 +127,9 @@
     .tick110 { transform: translate(-50%,-50%) rotate(-15deg)  translateY(-130px) rotate(15deg);  }
     .tick120 { transform: translate(-50%,-50%) rotate(0deg)    translateY(-130px) rotate(0deg);   }
 
-    /* Contenedor de burbujas flotantes adicionales para información */
+    /* Burbujas flotantes adicionales: ahora con clase draggable para arrastrarlas.
+       Agregamos touch-action: none para móviles.
+    */
     .draggable {
       position: absolute;
       width: 70px;
@@ -145,8 +147,9 @@
       user-select: none;
       z-index: 4;
       padding: 4px;
+      touch-action: none;
     }
-    /* Posiciones iniciales para las burbujas flotantes (a la derecha del velocímetro) */
+    /* Posiciones iniciales para las burbujas adicionales */
     #bubbleClock { top: 20px; right: -80px; }
     #bubbleTemp { top: 100px; right: -80px; }
     #bubbleAlt { top: 180px; right: -80px; }
@@ -184,6 +187,7 @@
       font-weight: bold;
       font-size: 14px;
     }
+
     /* Botones */
     .btn-row {
       margin: 10px 0;
@@ -234,7 +238,7 @@
       <p id="speedDisplay">0 km/h</p>
     </div>
 
-    <!-- Burbujas flotantes adicionales: se pueden mover -->
+    <!-- Burbujas flotantes adicionales (draggable) -->
     <div class="draggable" id="bubbleClock">
       <span>Hora</span>
       <span id="clock">--:--:--</span>
@@ -256,7 +260,7 @@
       <span id="timeVal">00:00:00</span>
     </div>
 
-    <!-- Burbujas inferiores (Acumulado, Promedio) -->
+    <!-- Burbujas inferiores (Acumulado, Promedio) - draggable -->
     <div class="bottom-bubbles-container">
       <div class="draggable small-bubble bottom">
         <span>Acumulado</span>
@@ -416,7 +420,7 @@
     }
     setInterval(updateClock, 1000);
 
-    // Código interact.js para hacer elementos "draggable"
+    // Código interact.js para hacer los elementos "draggable"
     interact('.draggable').draggable({
       listeners: {
         move(event) {
