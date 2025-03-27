@@ -1,143 +1,434 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Velocímetro GPS</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { text-align: center; font-family: Arial, sans-serif; background-color: #000; color: #0f0; }
-        .container { margin-top: 20px; }
-        button { padding: 12px 24px; font-size: 20px; margin: 5px; cursor: pointer; border-radius: 10px; border: none; transition: transform 0.1s, background-color 0.3s; background: linear-gradient(45deg, #007BFF, #00FF00); color: white; }
-        button:active { transform: scale(0.95); background-color: #555; }
-        #kmTotal { font-size: 50px; font-weight: bold; }
-        #speedDisplay { font-size: 100px; font-family: 'Digital-7', sans-serif; margin-top: 10px; }
-        @font-face {
-            font-family: 'Digital-7';
-            src: url('https://fonts.cdnfonts.com/s/16119/Digital7-rg1mL.woff') format('woff');
-        }
-        .speedometer-container {
-            position: relative;
-            width: 300px;
-            height: 160px;
-            margin: auto;
-        }
-        .arc {
-            width: 100%;
-            height: 100%;
-            border-radius: 300px 300px 0 0;
-            background: conic-gradient(
-                red 0deg, orange 60deg, yellow 120deg, green 180deg
-            );
-        }
-        .needle {
-            position: absolute;
-            width: 6px;
-            height: 90px;
-            background: red;
-            top: 50%;
-            left: 50%;
-            transform-origin: bottom center;
-            transform: translateX(-50%) rotate(-90deg);
-            transition: transform 0.3s ease-out;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Velocímetro GPS</title>
+  <!-- Cargamos interact.js para que las burbujas sean arrastrables -->
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+  <style>
+    /* RESET BÁSICO */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #000;
+      color: #0f0;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      min-height: 100vh;
+      position: relative;
+    }
+    h2 {
+      margin: 10px 0;
+      color: #0ff;
+      text-shadow: 0 0 5px #0ff;
+    }
+    .main-container {
+      width: 100%;
+      max-width: 420px;
+      margin: auto;
+      position: relative;
+      padding-bottom: 20px;
+    }
+    /* Velocímetro circular, mostrando semicírculo de 0..120 */
+    .speedometer {
+      position: relative;
+      width: 280px;
+      height: 280px;
+      margin: 20px auto;
+      border-radius: 50%;
+      background: radial-gradient(circle, #333, #000);
+      box-shadow: 0 0 20px rgba(0,255,0,0.8);
+      overflow: hidden;
+    }
+    /* Arco decorativo para semicírculo */
+    .speed-arc {
+      position: absolute;
+      width: 100%;
+      height: 50%;
+      bottom: 0;
+      left: 0;
+      background: conic-gradient(#0ff 180deg, #0ff 360deg, #222 360deg);
+      clip-path: ellipse(50% 100% at 50% 100%);
+      opacity: 0.2;
+      z-index: 1;
+    }
+    /* Aguja */
+    .needle {
+      position: absolute;
+      width: 6px;
+      height: 130px;
+      background: linear-gradient(to bottom, #fff, #ff0);
+      top: 50%;
+      left: 50%;
+      transform-origin: bottom center;
+      /* 0 km/h => -180°, 120 km/h => 0° */
+      transform: translateX(-50%) rotate(-180deg);
+      transition: transform 0.3s ease-out;
+      border-radius: 3px;
+      box-shadow: 0 0 5px #ff0;
+      z-index: 2;
+    }
+    /* Texto de velocidad en el centro */
+    #speedDisplay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 40px;
+      font-family: 'Arial', sans-serif;
+      color: #fff;
+      margin: 0;
+      z-index: 2;
+      text-shadow: 0 0 5px #fff;
+    }
+    /* Fuente digital */
+    @font-face {
+      font-family: 'Digital-7';
+      src: url('https://fonts.cdnfonts.com/s/16119/Digital7-rg1mL.woff') format('woff');
+    }
+    /* Marcas de velocidad en semicírculo: de -180° a 0° */
+    .ticks-container {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .tick {
+      position: absolute;
+      width: 30px;
+      height: 20px;
+      color: #0f0;
+      text-align: center;
+      font-size: 14px;
+      top: 50%;
+      left: 50%;
+      transform-origin: center bottom;
+    }
+    /* Cada 10 km/h equivale a 15°:
+       0 km/h => -180°, 10 => -165°, ... , 120 => 0° */
+    .tick0   { transform: translate(-50%,-50%) rotate(-180deg) translateY(-130px) rotate(180deg); }
+    .tick10  { transform: translate(-50%,-50%) rotate(-165deg) translateY(-130px) rotate(165deg); }
+    .tick20  { transform: translate(-50%,-50%) rotate(-150deg) translateY(-130px) rotate(150deg); }
+    .tick30  { transform: translate(-50%,-50%) rotate(-135deg) translateY(-130px) rotate(135deg); }
+    .tick40  { transform: translate(-50%,-50%) rotate(-120deg) translateY(-130px) rotate(120deg); }
+    .tick50  { transform: translate(-50%,-50%) rotate(-105deg) translateY(-130px) rotate(105deg); }
+    .tick60  { transform: translate(-50%,-50%) rotate(-90deg)  translateY(-130px) rotate(90deg);  }
+    .tick70  { transform: translate(-50%,-50%) rotate(-75deg)  translateY(-130px) rotate(75deg);  }
+    .tick80  { transform: translate(-50%,-50%) rotate(-60deg)  translateY(-130px) rotate(60deg);  }
+    .tick90  { transform: translate(-50%,-50%) rotate(-45deg)  translateY(-130px) rotate(45deg);  }
+    .tick100 { transform: translate(-50%,-50%) rotate(-30deg)  translateY(-130px) rotate(30deg);  }
+    .tick110 { transform: translate(-50%,-50%) rotate(-15deg)  translateY(-130px) rotate(15deg);  }
+    .tick120 { transform: translate(-50%,-50%) rotate(0deg)    translateY(-130px) rotate(0deg);   }
+
+    /* Contenedor de burbujas flotantes adicionales para información */
+    .draggable {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #333, #111);
+      box-shadow: 0 0 10px rgba(0,255,0,0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #fff;
+      cursor: move;
+      user-select: none;
+      z-index: 4;
+      padding: 4px;
+    }
+    /* Posiciones iniciales para las burbujas flotantes (a la derecha del velocímetro) */
+    #bubbleClock { top: 20px; right: -80px; }
+    #bubbleTemp { top: 100px; right: -80px; }
+    #bubbleAlt { top: 180px; right: -80px; }
+    #bubbleDist { top: 260px; right: -80px; }
+    #bubbleTime { top: 340px; right: -80px; }
+
+    /* Burbujas inferiores (Acumulado, Promedio) - también arrastrables */
+    .draggable.bottom {
+      width: 90px;
+      height: 90px;
+      margin: 5px;
+    }
+    .bottom-bubbles-container {
+      display: flex;
+      justify-content: space-around;
+      margin: 10px auto 0;
+      width: 100%;
+      max-width: 420px;
+    }
+    .small-bubble {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #333, #111);
+      box-shadow: 0 0 10px rgba(0,255,0,0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #fff;
+      margin: 5px;
+    }
+    .small-bubble span {
+      font-weight: bold;
+      font-size: 14px;
+    }
+    /* Botones */
+    .btn-row {
+      margin: 10px 0;
+    }
+    button {
+      padding: 10px 15px;
+      font-size: 16px;
+      margin: 5px;
+      cursor: pointer;
+      border-radius: 8px;
+      border: none;
+      transition: transform 0.1s, background-color 0.3s;
+      background: linear-gradient(45deg, #007BFF, #00FF00);
+      color: white;
+    }
+    button:active {
+      transform: scale(0.95);
+      background-color: #555;
+    }
+    .info-container {
+      border: 2px solid #0f0;
+      padding: 10px;
+      margin: 10px auto;
+      width: 90%;
+      text-align: left;
+      font-size: 14px;
+      color: #0f0;
+    }
+  </style>
 </head>
+
 <body>
-    <h2>Velocímetro GPS</h2>
-    <div class="speedometer-container">
-        <div class="arc"></div>
-        <div class="needle" id="needle"></div>
+  <h2>Velocímetro GPS</h2>
+  <div class="main-container">
+    <!-- Velocímetro principal -->
+    <div class="speedometer">
+      <div class="speed-arc"></div>
+      <div class="ticks-container">
+        <div class="tick tick0">0</div>
+        <div class="tick tick20">20</div>
+        <div class="tick tick40">40</div>
+        <div class="tick tick60">60</div>
+        <div class="tick tick80">80</div>
+        <div class="tick tick100">100</div>
+        <div class="tick tick120">120</div>
+      </div>
+      <div class="needle" id="needle"></div>
+      <p id="speedDisplay">0 km/h</p>
     </div>
-    <p id="speedDisplay">0 km/h</p>
-    <div class="container">
-        <button onclick="startTracking()">Iniciar</button>
-        <button onclick="stopTracking()">Detener</button>
-        <button onclick="resetKM()">Reiniciar KM</button>
-        <button onclick="resetSpeed()">Restablecer</button>
-        <p>Distancia recorrida: <span id="distance">0</span> km</p>
-        <p>Total acumulado: <span id="kmTotal">0</span> km</p>
-        <p>Tiempo transcurrido: <span id="elapsedTime">0</span> s</p>
-        <p>Velocidad promedio: <span id="averageSpeed">0</span> km/h</p>
+
+    <!-- Burbujas flotantes adicionales: se pueden mover -->
+    <div class="draggable" id="bubbleClock">
+      <span>Hora</span>
+      <span id="clock">--:--:--</span>
     </div>
-    
-    <script>
-        let kmTotal = parseFloat(localStorage.getItem('kmTotal')) || 0;
-        let prevPosition = null;
-        let watchId = null;
-        let startTime = null;
-        let elapsedTime = 0;
-        let totalSpeed = 0;
-        let speedCount = 0;
-        document.getElementById('kmTotal').innerText = kmTotal.toFixed(2);
+    <div class="draggable" id="bubbleTemp">
+      <span>Temp</span>
+      <span id="tempVal">- °C</span>
+    </div>
+    <div class="draggable" id="bubbleAlt">
+      <span>Alt</span>
+      <span id="altitudeVal">- m</span>
+    </div>
+    <div class="draggable" id="bubbleDist">
+      <span>Dist</span>
+      <span id="distVal">0 km</span>
+    </div>
+    <div class="draggable" id="bubbleTime">
+      <span>Tiempo</span>
+      <span id="timeVal">00:00:00</span>
+    </div>
 
-        function updateSpeedometer(speed) {
-            let displaySpeed = speed * 3.6;
-            document.getElementById('speedDisplay').innerText = displaySpeed.toFixed(1) + " km/h";
-            document.getElementById('needle').style.transform = `translateX(-50%) rotate(${(displaySpeed / 120) * 180 - 90}deg)`;
-            totalSpeed += displaySpeed;
-            speedCount++;
-            document.getElementById('averageSpeed').innerText = (totalSpeed / speedCount).toFixed(1);
-        }
+    <!-- Burbujas inferiores (Acumulado, Promedio) -->
+    <div class="bottom-bubbles-container">
+      <div class="draggable small-bubble bottom">
+        <span>Acumulado</span>
+        <br><span id="kmTotal">0</span> km
+      </div>
+      <div class="draggable small-bubble bottom">
+        <span>Promedio</span>
+        <br><span id="averageSpeed">0</span> km/h
+      </div>
+    </div>
 
-        function startTracking() {
-            if (watchId === null) {
-                startTime = Date.now();
-                watchId = navigator.geolocation.watchPosition(position => {
-                    let { speed, latitude, longitude } = position.coords;
-                    if (speed === null) speed = 0;
-                    updateSpeedometer(speed);
-                    elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
-                    document.getElementById('elapsedTime').innerText = elapsedTime;
-                    
-                    if (prevPosition) {
-                        let distance = calculateDistance(prevPosition.latitude, prevPosition.longitude, latitude, longitude);
-                        kmTotal += distance;
-                        document.getElementById('distance').innerText = distance.toFixed(2);
-                        document.getElementById('kmTotal').innerText = kmTotal.toFixed(2);
-                        localStorage.setItem('kmTotal', kmTotal);
-                    }
-                    prevPosition = { latitude, longitude };
-                }, error => {
-                    alert("Error obteniendo datos de GPS");
-                }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+    <!-- Botones de control -->
+    <div class="btn-row">
+      <button onclick="startTracking()">Iniciar</button>
+      <button onclick="stopTracking()">Detener</button>
+      <button onclick="resetKM()">Reiniciar KM</button>
+      <button onclick="resetSpeed()">Restablecer</button>
+    </div>
+
+    <!-- Historial de reinicio -->
+    <div class="info-container">
+      <h3>Historial de reinicio</h3>
+      <p>Último reinicio: <span id="resetTimestamp">-</span></p>
+      <p>Galones ingresados: <span id="lastGallons">0</span> gal</p>
+      <p>Rendimiento: <span id="fuelEfficiency">0</span> km/gal</p>
+    </div>
+  </div>
+
+  <script>
+    /* ===== LÓGICA ORIGINAL INTACTA ===== */
+    let kmTotal = parseFloat(localStorage.getItem('kmTotal')) || 0;
+    let distanceTraveled = 0;
+    let prevPosition = null;
+    let watchId = null;
+    let startTime = null;
+    let elapsedTime = 0;
+    let totalSpeed = 0;
+    let speedCount = 0;
+    document.getElementById('kmTotal').innerText = kmTotal.toFixed(2);
+
+    function updateSpeedometer(speed) {
+      let displaySpeed = speed * 3.6;
+      document.getElementById('speedDisplay').innerText = displaySpeed.toFixed(1) + " km/h";
+      let clamped = Math.min(displaySpeed, 120);
+      // 0 km/h => -180°, 120 km/h => 0°
+      let angle = -180 + ((clamped / 120) * 180);
+      document.getElementById('needle').style.transform = `translateX(-50%) rotate(${angle}deg)`;
+      totalSpeed += displaySpeed;
+      speedCount++;
+      document.getElementById('averageSpeed').innerText = (totalSpeed / speedCount).toFixed(1);
+    }
+
+    function startTracking() {
+      if (watchId === null) {
+        startTime = Date.now();
+        watchId = navigator.geolocation.watchPosition(position => {
+          let { speed, latitude, longitude, altitude } = position.coords;
+          if (speed === null) speed = 0;
+          updateSpeedometer(speed);
+          elapsedTime = (Date.now() - startTime) / 1000;
+          // Formatear elapsedTime a HH:MM:SS
+          let hours = Math.floor(elapsedTime / 3600);
+          let minutes = Math.floor((elapsedTime % 3600) / 60);
+          let seconds = Math.floor(elapsedTime % 60);
+          let timeFormatted =
+              String(hours).padStart(2, '0') + ':' +
+              String(minutes).padStart(2, '0') + ':' +
+              String(seconds).padStart(2, '0');
+          document.getElementById('timeVal').innerText = timeFormatted;
+          if (prevPosition) {
+            let distance = calculateDistance(prevPosition.latitude, prevPosition.longitude, latitude, longitude);
+            if(distance > 0){
+              distanceTraveled += distance;
+              kmTotal += distance;
+              document.getElementById('distance').innerText = distanceTraveled.toFixed(2);
+              document.getElementById('kmTotal').innerText = kmTotal.toFixed(2);
+              localStorage.setItem('kmTotal', kmTotal);
+              document.getElementById('distVal').innerText = distanceTraveled.toFixed(2) + " km";
             }
-        }
+          }
+          prevPosition = { latitude, longitude };
+        }, error => {
+          alert("Error obteniendo datos de GPS");
+        }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+        obtenerTemperatura();
+      }
+    }
 
-        function stopTracking() {
-            if (watchId !== null) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
+    function stopTracking() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+    }
+
+    function resetKM() {
+      let gallons = parseFloat(prompt("Ingrese la cantidad de galones de gasolina agregados:"));
+      if (!isNaN(gallons) && gallons > 0) {
+        let efficiency = kmTotal / gallons;
+        document.getElementById('fuelEfficiency').innerText = efficiency.toFixed(2);
+        document.getElementById('lastGallons').innerText = gallons;
+        let now = new Date().toLocaleString();
+        document.getElementById('resetTimestamp').innerText = now;
+      } else {
+        alert("Por favor, ingrese un valor válido de galones.");
+        return;
+      }
+      kmTotal = 0;
+      distanceTraveled = 0;
+      localStorage.setItem('kmTotal', 0);
+      document.getElementById('kmTotal').innerText = "0";
+      document.getElementById('distance').innerText = "0";
+      document.getElementById('distVal').innerText = "0 km";
+    }
+
+    function resetSpeed() {
+      updateSpeedometer(0);
+      stopTracking();
+      elapsedTime = 0;
+      document.getElementById('timeVal').innerText = "00:00:00";
+      document.getElementById('averageSpeed').innerText = "0";
+      totalSpeed = 0;
+      speedCount = 0;
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function obtenerTemperatura() {
+      navigator.geolocation.getCurrentPosition(position => {
+        let lat = position.coords.latitude;
+        let lon = position.coords.longitude;
+        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
+          .then(response => response.json())
+          .then(data => {
+            if(data && data.current_weather){
+              document.getElementById('tempVal').innerText = data.current_weather.temperature + " °C";
+              document.getElementById('temperature').innerText = data.current_weather.temperature;
             }
-        }
-        
-        function resetKM() {
-            kmTotal = 0;
-            localStorage.setItem('kmTotal', 0);
-            document.getElementById('kmTotal').innerText = "0";
-            document.getElementById('distance').innerText = "0";
-        }
+          })
+          .catch(error => console.error('Error obteniendo temperatura:', error));
+      });
+    }
 
-        function resetSpeed() {
-            updateSpeedometer(0);
-            stopTracking();
-            elapsedTime = 0;
-            document.getElementById('elapsedTime').innerText = "0";
-            document.getElementById('averageSpeed').innerText = "0";
-            totalSpeed = 0;
-            speedCount = 0;
+    // Reloj en tiempo real para la burbuja (opcional)
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').innerText = now.toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+
+    // Código interact.js para hacer elementos "draggable"
+    interact('.draggable').draggable({
+      listeners: {
+        move(event) {
+          const target = event.target;
+          const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+          const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+          target.style.transform = `translate(${x}px, ${y}px)`;
+          target.setAttribute('data-x', x);
+          target.setAttribute('data-y', y);
         }
-        
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        }
-    </script>
+      }
+    });
+  </script>
 </body>
 </html>
